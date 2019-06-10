@@ -494,10 +494,10 @@ function insertDiaryNetCarbsColumn(diaryTable, targetColumnIndex = -1) {
       }
       
       // calculate net carbs for food
-      const carbs = getNutrientValue(food.nutrients, diaryTable.carbsColumn);
-      const fiber = getNutrientValue(food.nutrients, diaryTable.fiberColumn);
+      const carbs = NaNify(getNutrientValue(food.nutrients, diaryTable.carbsColumn));
+      const fiber = NaNify(getNutrientValue(food.nutrients, diaryTable.fiberColumn));
       
-      const netCarbs = Math.max(NaNify(carbs) - NaNify(fiber), 0);
+      const netCarbs = Math.max(carbs - fiber, 0);
       mealTotalNetCarbs += netCarbs;
       totalNetCarbs += netCarbs;
       
@@ -522,8 +522,8 @@ function insertDiaryNetCarbsColumn(diaryTable, targetColumnIndex = -1) {
   }
   
   // create cells for footer rows
-  const netCarbsGoal = getNutrientValue(diaryTable.goalNutrients, diaryTable.carbsColumn);
-  const netCarbsRemaining = NaNify(netCarbsGoal) - totalNetCarbs;
+  const netCarbsGoal = NaNify(getNutrientValue(diaryTable.goalNutrients, diaryTable.carbsColumn));
+  const netCarbsRemaining = netCarbsGoal - totalNetCarbs;
   
   if (diaryTable.totalNutrients) {
     diaryTable.totalNutrients.push(
@@ -717,8 +717,8 @@ function insertTotalCaloriePercentages(diaryTable) {
     const fat      = fatNutrient      && fatNutrient     .value;
     
     if (
-      netCarbs === null ||
-      protein === null ||
+      netCarbs === null &&
+      protein === null &&
       fat === null
     ) {
       continue;
@@ -821,13 +821,13 @@ async function insertKetoCalorieGraph(diaryTable, containerElem) {
   await googleAPIPromise;
   
   // get nutrients totals
-  const netCarbs = getNutrientValue(diaryTable.totalNutrients, diaryTable.netCarbsColumn);
-  const protein  = getNutrientValue(diaryTable.totalNutrients, diaryTable.proteinColumn);
-  const fat      = getNutrientValue(diaryTable.totalNutrients, diaryTable.fatColumn);
+  const netCarbs = NaNify(getNutrientValue(diaryTable.totalNutrients, diaryTable.netCarbsColumn));
+  const protein  = NaNify(getNutrientValue(diaryTable.totalNutrients, diaryTable.proteinColumn));
+  const fat      = NaNify(getNutrientValue(diaryTable.totalNutrients, diaryTable.fatColumn));
   
-  const carbCals    = NaNify(netCarbs) * 4;
-  const proteinCals = NaNify(protein) * 4;
-  const fatCals     = NaNify(fat) * 9;
+  const carbCals    = netCarbs * 4;
+  const proteinCals = protein * 4;
+  const fatCals     = fat * 9;
   const totalCals   = carbCals + proteinCals + fatCals;
   
   if (isNaN(totalCals)) {
@@ -872,11 +872,11 @@ async function insertKetoNutrientGraph(diaryTable, containerElem) {
   await googleAPIPromise;
   
   // get nutrients totals
-  const netCarbs = getNutrientValue(diaryTable.totalNutrients, diaryTable.netCarbsColumn);
-  const protein  = getNutrientValue(diaryTable.totalNutrients, diaryTable.proteinColumn);
-  const fat      = getNutrientValue(diaryTable.totalNutrients, diaryTable.fatColumn);
+  const netCarbs = NaNify(getNutrientValue(diaryTable.totalNutrients, diaryTable.netCarbsColumn));
+  const protein  = NaNify(getNutrientValue(diaryTable.totalNutrients, diaryTable.proteinColumn));
+  const fat      = NaNify(getNutrientValue(diaryTable.totalNutrients, diaryTable.fatColumn));
   
-  const totalGrams = NaNify(netCarbs) + NaNify(protein) + NaNify(fat);
+  const totalGrams = netCarbs + protein + fat;
   
   if (isNaN(totalGrams)) {
     containerElem.innerText = 'Unable to load chart: data missing.';

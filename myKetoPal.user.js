@@ -63,7 +63,11 @@
  */
 
 const googleAPIPromise = loadGoogleAPI();
+let __execIdSeq = 0;
+
 (async function run() {
+  await execOnPage(customEventPolyfill);
+  
   // get all the diary tables on the page
   const diaryTables = getDiaryTables(document);
   
@@ -86,7 +90,9 @@ const googleAPIPromise = loadGoogleAPI();
     // create google charts
     await createGoogleCharts(diaryTable, netCarbsColumn);
   }
-})();
+})().catch(err => {
+  console.error(err);
+});
 
 async function loadGoogleAPI() {
   const script = document.createElement('script');
@@ -96,8 +102,9 @@ async function loadGoogleAPI() {
   
   await new Promise(resolve => script.addEventListener('load', resolve, {once: true}));
   
-  google.charts.load('current', {packages: ['corechart']});
-  await new Promise(resolve => google.charts.setOnLoadCallback(resolve));
+  await execOnPage(async () => {
+    await google.charts.load('current', {packages: ['corechart']});
+  });
 }
 
 /**
@@ -771,27 +778,29 @@ async function createGoogleCharts(diaryTable, netCarbsColumn) {
   const graphContainersElem = document.createElement('div');
   
   const calorieGraphContainerElem = document.createElement('div');
+  calorieGraphContainerElem.id = 'mkp-calorie-graph-container';
   calorieGraphContainerElem.style.cssFloat = 'left';
   calorieGraphContainerElem.style.width = '50%';
   graphContainersElem.append(calorieGraphContainerElem);
   
   const nutrientGraphContainerElem = document.createElement('div');
+  nutrientGraphContainerElem.id = 'mkp-nutrient-graph-container';
   nutrientGraphContainerElem.style.cssFloat = 'left';
   nutrientGraphContainerElem.style.width = '50%';
   graphContainersElem.append(nutrientGraphContainerElem);
   
   diaryTable.tableElem.insertAdjacentElement('afterend', graphContainersElem);
   
-  await createKetoCalorieGraph(diaryTable, netCarbsColumn, calorieGraphContainerElem);
-  await createKetoNutrientGraph(diaryTable, netCarbsColumn, nutrientGraphContainerElem);
+  await createKetoCalorieGraph(diaryTable, netCarbsColumn, calorieGraphContainerElem.id);
+  await createKetoNutrientGraph(diaryTable, netCarbsColumn, nutrientGraphContainerElem.id);
 }
 
 /**
  * @param {DiaryTable} diaryTable 
  * @param {DiaryColumn} netCarbsColumn 
- * @param {Element} containerElem 
+ * @param {string} containerElemId 
  */
-async function createKetoCalorieGraph(diaryTable, netCarbsColumn, containerElem) {
+async function createKetoCalorieGraph(diaryTable, netCarbsColumn, containerElemId) {
   await googleAPIPromise;
   
   // get nutrients totals
@@ -805,7 +814,10 @@ async function createKetoCalorieGraph(diaryTable, netCarbsColumn, containerElem)
   const totalCals   = carbCals + proteinCals + fatCals;
   
   if (isNaN(totalCals)) {
-    containerElem.innerText = 'Unable to load chart: data missing.';
+    const containerElem = document.getElementById(containerElemId);
+    if (containerElem) {
+      containerElem.innerText = 'Unable to load chart: data missing.';
+    }
     return;
   }
   if (totalCals === 0) {
@@ -818,31 +830,31 @@ async function createKetoCalorieGraph(diaryTable, netCarbsColumn, containerElem)
     'Fat': fatCals,
   };
   
-  const dataTable = new google.visualization.DataTable();
-  dataTable.addColumn('string', 'Type');
-  dataTable.addColumn('number', 'Cals');
-  dataTable.addRows(Object.keys(rowMap).map(label => {
+  const dataTableArray = [
+    ['Type', 'Cals']
+  ].concat(Object.keys(rowMap).map(label => {
     const cals = rowMap[label];
     const prct = roundPrct(cals/totalCals);
     return [`${label}: ${cals} - ${prct}%`, prct];
   }));
   
-  const chart = new google.visualization.PieChart(containerElem);
-  chart.draw(dataTable, {
-    title: 'Daily Totals by Calories',
-    enableInteractivity: false,
-    chartArea: {left: 10, right: 20}
-  });
-  
-  return chart;
+  await execOnPage(({containerElemId, dataTableArray}) => {
+    const dataTable = google.visualization.arrayToDataTable(dataTableArray);
+    const chart = new google.visualization.PieChart(document.getElementById(containerElemId));
+    chart.draw(dataTable, {
+      title: 'Daily Totals by Calories',
+      enableInteractivity: false,
+      chartArea: {left: 10, right: 20}
+    });
+  }, {containerElemId, dataTableArray});
 }
 
 /**
  * @param {DiaryTable} diaryTable 
  * @param {DiaryColumn} netCarbsColumn 
- * @param {Element} containerElem 
+ * @param {string} containerElemId 
  */
-async function createKetoNutrientGraph(diaryTable, netCarbsColumn, containerElem) {
+async function createKetoNutrientGraph(diaryTable, netCarbsColumn, containerElemId) {
   await googleAPIPromise;
   
   // get nutrients totals
@@ -853,7 +865,10 @@ async function createKetoNutrientGraph(diaryTable, netCarbsColumn, containerElem
   const totalGrams = NaNify(netCarbs) + NaNify(protein) + NaNify(fat);
   
   if (isNaN(totalGrams)) {
-    containerElem.innerText = 'Unable to load chart: data missing.';
+    const containerElem = document.getElementById(containerElemId);
+    if (containerElem) {
+      containerElem.innerText = 'Unable to load chart: data missing.';
+    }
     return;
   }
   if (totalGrams === 0) {
@@ -866,23 +881,23 @@ async function createKetoNutrientGraph(diaryTable, netCarbsColumn, containerElem
     'Fat': fat,
   };
   
-  const dataTable = new google.visualization.DataTable();
-  dataTable.addColumn('string', 'Type');
-  dataTable.addColumn('number', 'Grams');
-  dataTable.addRows(Object.keys(rowMap).map(label => {
+  const dataTableArray = [
+    ['Type', 'Grams']
+  ].concat(Object.keys(rowMap).map(label => {
     const grams = rowMap[label];
     const prct = roundPrct(grams/totalGrams);
     return [`${label}: ${grams}g - ${prct}%`, prct];
   }));
   
-  const chart = new google.visualization.PieChart(containerElem);
-  chart.draw(dataTable, {
-    title: 'Daily Totals by Grams',
-    enableInteractivity: false,
-    chartArea: {left: 10, right: 20}
-  });
-  
-  return chart;
+  await execOnPage(({containerElemId, dataTableArray}) => {
+    const dataTable = google.visualization.arrayToDataTable(dataTableArray);
+    const chart = new google.visualization.PieChart(document.getElementById(containerElemId));
+    chart.draw(dataTable, {
+      title: 'Daily Totals by Grams',
+      enableInteractivity: false,
+      chartArea: {left: 10, right: 20}
+    });
+  }, {containerElemId, dataTableArray});
 }
 
 /**
@@ -936,4 +951,56 @@ function NaNify(val) {
  */
 function roundPrct(num) {
   return Math.round(num*100);
+}
+
+function customEventPolyfill() {
+  // https://developer.mozilla.org/en-US/docs/Web/API/CustomEvent/CustomEvent#Polyfill
+  /* eslint-disable */
+  if ( typeof window.CustomEvent === "function" ) return false;
+
+  function CustomEvent ( event, params ) {
+    params = params || { bubbles: false, cancelable: false, detail: null };
+    var evt = document.createEvent( 'CustomEvent' );
+    evt.initCustomEvent( event, params.bubbles, params.cancelable, params.detail );
+    return evt;
+  }
+
+  CustomEvent.prototype = window.Event.prototype;
+
+  window.CustomEvent = CustomEvent;
+  /* eslint-enable */
+}
+
+/**
+ * @param {Function} fn 
+ * @param {*} jsonParam
+ */
+async function execOnPage(fn, jsonParam) {
+  const execId = __execIdSeq++;
+  const script = document.createElement('script');
+  script.setAttribute('async', '');
+  script.textContent = `
+    (
+      async () => await (${fn})(${JSON.stringify(jsonParam)})
+    )()
+    .then (result => document.dispatchEvent(new CustomEvent('exec-on-page-complete', {detail: {id: ${JSON.stringify(execId)}, result}})))
+    .catch(error  => document.dispatchEvent(new CustomEvent('exec-on-page-complete', {detail: {id: ${JSON.stringify(execId)}, error }})));
+  `;
+  
+  const result = await new Promise((resolve, reject) => {
+    document.addEventListener('exec-on-page-complete', event => {
+      if (!event.detail || event.detail.id !== execId) {
+        return;
+      }
+      if (event.detail.error) {
+        reject(event.detail.error);
+        return;
+      }
+      resolve(event.detail.result);
+    }, {once: true});
+    document.body.appendChild(script);
+  });
+  
+  document.body.removeChild(script);
+  return result;
 }

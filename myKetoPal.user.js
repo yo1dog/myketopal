@@ -23,6 +23,7 @@
  * @property {DiaryColumn}         [fiberColumn]
  * @property {DiaryColumn}         [fatColumn]
  * @property {DiaryColumn}         [proteinColumn]
+ * @property {DiaryColumn}         [netCarbsColumn]
  * @property {Meal[]}              meals
  * @property {Nutrients[]}         [totalNutrients]
  * @property {Nutrients[]}         [goalNutrients]
@@ -62,11 +63,30 @@
  * @property {Element}              [percentageElem]
  */
 
-const googleAPIPromise = loadGoogleAPI();
 let __execIdSeq = 0;
 
-(async function run() {
+// run the script on the page
+(async function runScript() {
   await execOnPage(customEventPolyfill);
+  await execOnPage(myKetoPal);
+})().catch(err => {
+  console.error(err);
+});
+
+
+function myKetoPal() {
+// ==================================================
+// ==================================================
+// myKetoPal start
+// ==================================================
+// ==================================================
+
+
+let googleAPIPromise = null;
+
+(async function run() {
+  
+  googleAPIPromise = loadGoogleAPI();
   
   // get all the diary tables on the page
   const diaryTables = getDiaryTables(document);
@@ -77,7 +97,7 @@ let __execIdSeq = 0;
       diaryTable.carbsColumn? diaryTable.carbsColumn.index + 1 :
       2
     );
-    const netCarbsColumn = insertDiaryNetCarbsColumn(diaryTable, netCarbColumnIndex);
+    insertDiaryNetCarbsColumn(diaryTable, netCarbColumnIndex);
     
     // hide carbs column
     if (diaryTable.carbsColumn) {
@@ -85,14 +105,14 @@ let __execIdSeq = 0;
     }
     
     // add total calorie percentages
-    insertTotalCaloriePercentages(diaryTable, netCarbsColumn);
-    
-    // create google charts
-    await createGoogleCharts(diaryTable, netCarbsColumn);
+    insertTotalCaloriePercentages(diaryTable);
   }
-})().catch(err => {
-  console.error(err);
-});
+  
+  // insert graphs (do this last because it is async)
+  for (const diaryTable of diaryTables) {
+    await insertGraphs(diaryTable);
+  }
+})();
 
 async function loadGoogleAPI() {
   const script = document.createElement('script');
@@ -101,10 +121,7 @@ async function loadGoogleAPI() {
   document.body.appendChild(script);
   
   await new Promise(resolve => script.addEventListener('load', resolve, {once: true}));
-  
-  await execOnPage(async () => {
-    await google.charts.load('current', {packages: ['corechart']});
-  });
+  await google.charts.load('current', {packages: ['corechart']});
 }
 
 /**
@@ -139,10 +156,11 @@ function readDiaryTable(diaryTableElem) {
   const headerRowElem = diaryTableElem.querySelector('tr');
   const columns = getDiaryColumns(headerRowElem);
   
-  const carbsColumn   = columns.find(column => column.name === 'carbs'  );
-  const fiberColumn   = columns.find(column => column.name === 'fiber'  );
-  const fatColumn     = columns.find(column => column.name === 'fat'    );
-  const proteinColumn = columns.find(column => column.name === 'protein');
+  const carbsColumn    = columns.find(column => column.name === 'carbs'  );
+  const fiberColumn    = columns.find(column => column.name === 'fiber'  );
+  const fatColumn      = columns.find(column => column.name === 'fat'    );
+  const proteinColumn  = columns.find(column => column.name === 'protein');
+  const netCarbsColumn = null;
   
   // separate the rows
   /** @type {HTMLTableRowElement[]} */ let mealRowElems     = [];
@@ -195,6 +213,7 @@ function readDiaryTable(diaryTableElem) {
     fiberColumn,
     fatColumn,
     proteinColumn,
+    netCarbsColumn,
     meals,
     totalNutrients,
     goalNutrients,
@@ -461,6 +480,7 @@ function insertDiaryNetCarbsColumn(diaryTable, targetColumnIndex = -1) {
     headerCellElem: netCarbsHeaderCellElem
   };
   diaryTable.columns.push(netCarbsColumn);
+  diaryTable.netCarbsColumn = netCarbsColumn;
   
   let totalNetCarbs = 0;
   
@@ -675,20 +695,20 @@ function insertCell(rowElem, index = -1) {
 
 /**
  * @param {DiaryTable} diaryTable 
- * @param {DiaryColumn} netCarbsColumn 
  */
-function insertTotalCaloriePercentages(diaryTable, netCarbsColumn) {
+function insertTotalCaloriePercentages(diaryTable) {
   // get the total nutrients for each meal
   /** @type {Nutrient[][]} */
   const nutrientsList = [
-    diaryTable.totalNutrients
+    diaryTable.totalNutrients,
+    diaryTable.goalNutrients
   ].concat(
     diaryTable.meals
     .map(meal => meal.totalNutrients)
   );
   
   for (const nutrients of nutrientsList) {
-    const netCarbsNutrient = getNutrient(nutrients, netCarbsColumn);
+    const netCarbsNutrient = getNutrient(nutrients, diaryTable.netCarbsColumn);
     const proteinNutrient  = getNutrient(nutrients, diaryTable.proteinColumn);
     const fatNutrient      = getNutrient(nutrients, diaryTable.fatColumn);
     
@@ -772,39 +792,36 @@ function hideDiaryColumn(diaryTable, columnIndex) {
 
 /**
  * @param {DiaryTable} diaryTable 
- * @param {DiaryColumn} netCarbsColumn 
  */
-async function createGoogleCharts(diaryTable, netCarbsColumn) {
+async function insertGraphs(diaryTable) {
   const graphContainersElem = document.createElement('div');
   
   const calorieGraphContainerElem = document.createElement('div');
-  calorieGraphContainerElem.id = 'mkp-calorie-graph-container';
   calorieGraphContainerElem.style.cssFloat = 'left';
   calorieGraphContainerElem.style.width = '50%';
   graphContainersElem.append(calorieGraphContainerElem);
   
   const nutrientGraphContainerElem = document.createElement('div');
-  nutrientGraphContainerElem.id = 'mkp-nutrient-graph-container';
   nutrientGraphContainerElem.style.cssFloat = 'left';
   nutrientGraphContainerElem.style.width = '50%';
   graphContainersElem.append(nutrientGraphContainerElem);
   
   diaryTable.tableElem.insertAdjacentElement('afterend', graphContainersElem);
   
-  await createKetoCalorieGraph(diaryTable, netCarbsColumn, calorieGraphContainerElem.id);
-  await createKetoNutrientGraph(diaryTable, netCarbsColumn, nutrientGraphContainerElem.id);
+  await insertKetoCalorieGraph(diaryTable, calorieGraphContainerElem);
+  await insertKetoNutrientGraph(diaryTable, nutrientGraphContainerElem);
 }
 
 /**
  * @param {DiaryTable} diaryTable 
- * @param {DiaryColumn} netCarbsColumn 
- * @param {string} containerElemId 
+ * @param {Element} containerElem 
+ * @returns {object}
  */
-async function createKetoCalorieGraph(diaryTable, netCarbsColumn, containerElemId) {
+async function insertKetoCalorieGraph(diaryTable, containerElem) {
   await googleAPIPromise;
   
   // get nutrients totals
-  const netCarbs = getNutrientValue(diaryTable.totalNutrients, netCarbsColumn);
+  const netCarbs = getNutrientValue(diaryTable.totalNutrients, diaryTable.netCarbsColumn);
   const protein  = getNutrientValue(diaryTable.totalNutrients, diaryTable.proteinColumn);
   const fat      = getNutrientValue(diaryTable.totalNutrients, diaryTable.fatColumn);
   
@@ -814,10 +831,7 @@ async function createKetoCalorieGraph(diaryTable, netCarbsColumn, containerElemI
   const totalCals   = carbCals + proteinCals + fatCals;
   
   if (isNaN(totalCals)) {
-    const containerElem = document.getElementById(containerElemId);
-    if (containerElem) {
-      containerElem.innerText = 'Unable to load chart: data missing.';
-    }
+    containerElem.innerText = 'Unable to load chart: data missing.';
     return;
   }
   if (totalCals === 0) {
@@ -830,45 +844,42 @@ async function createKetoCalorieGraph(diaryTable, netCarbsColumn, containerElemI
     'Fat': fatCals,
   };
   
-  const dataTableArray = [
-    ['Type', 'Cals']
-  ].concat(Object.keys(rowMap).map(label => {
+  const dataTable = new google.visualization.DataTable();
+  dataTable.addColumn('string', 'Type');
+  dataTable.addColumn('number', 'Cals');
+  dataTable.addRows(Object.keys(rowMap).map(label => {
     const cals = rowMap[label];
     const prct = roundPrct(cals/totalCals);
     return [`${label}: ${cals} - ${prct}%`, prct];
   }));
   
-  await execOnPage(({containerElemId, dataTableArray}) => {
-    const dataTable = google.visualization.arrayToDataTable(dataTableArray);
-    const chart = new google.visualization.PieChart(document.getElementById(containerElemId));
-    chart.draw(dataTable, {
-      title: 'Daily Totals by Calories',
-      enableInteractivity: false,
-      chartArea: {left: 10, right: 20}
-    });
-  }, {containerElemId, dataTableArray});
+  const chart = new google.visualization.PieChart(containerElem);
+  chart.draw(dataTable, {
+    title: 'Daily Totals by Calories',
+    enableInteractivity: false,
+    chartArea: {left: 10, right: 20}
+  });
+  
+  return chart;
 }
 
 /**
  * @param {DiaryTable} diaryTable 
- * @param {DiaryColumn} netCarbsColumn 
- * @param {string} containerElemId 
+ * @param {Element} containerElem
+ * @returns {object}
  */
-async function createKetoNutrientGraph(diaryTable, netCarbsColumn, containerElemId) {
+async function insertKetoNutrientGraph(diaryTable, containerElem) {
   await googleAPIPromise;
   
   // get nutrients totals
-  const netCarbs = getNutrientValue(diaryTable.totalNutrients, netCarbsColumn);
+  const netCarbs = getNutrientValue(diaryTable.totalNutrients, diaryTable.netCarbsColumn);
   const protein  = getNutrientValue(diaryTable.totalNutrients, diaryTable.proteinColumn);
   const fat      = getNutrientValue(diaryTable.totalNutrients, diaryTable.fatColumn);
   
   const totalGrams = NaNify(netCarbs) + NaNify(protein) + NaNify(fat);
   
   if (isNaN(totalGrams)) {
-    const containerElem = document.getElementById(containerElemId);
-    if (containerElem) {
-      containerElem.innerText = 'Unable to load chart: data missing.';
-    }
+    containerElem.innerText = 'Unable to load chart: data missing.';
     return;
   }
   if (totalGrams === 0) {
@@ -881,23 +892,23 @@ async function createKetoNutrientGraph(diaryTable, netCarbsColumn, containerElem
     'Fat': fat,
   };
   
-  const dataTableArray = [
-    ['Type', 'Grams']
-  ].concat(Object.keys(rowMap).map(label => {
+  const dataTable = new google.visualization.DataTable();
+  dataTable.addColumn('string', 'Type');
+  dataTable.addColumn('number', 'Grams');
+  dataTable.addRows(Object.keys(rowMap).map(label => {
     const grams = rowMap[label];
     const prct = roundPrct(grams/totalGrams);
     return [`${label}: ${grams}g - ${prct}%`, prct];
   }));
   
-  await execOnPage(({containerElemId, dataTableArray}) => {
-    const dataTable = google.visualization.arrayToDataTable(dataTableArray);
-    const chart = new google.visualization.PieChart(document.getElementById(containerElemId));
-    chart.draw(dataTable, {
-      title: 'Daily Totals by Grams',
-      enableInteractivity: false,
-      chartArea: {left: 10, right: 20}
-    });
-  }, {containerElemId, dataTableArray});
+  const chart = new google.visualization.PieChart(containerElem);
+  chart.draw(dataTable, {
+    title: 'Daily Totals by Grams',
+    enableInteractivity: false,
+    chartArea: {left: 10, right: 20}
+  });
+  
+  return chart;
 }
 
 /**
@@ -953,23 +964,14 @@ function roundPrct(num) {
   return Math.round(num*100);
 }
 
-function customEventPolyfill() {
-  // https://developer.mozilla.org/en-US/docs/Web/API/CustomEvent/CustomEvent#Polyfill
-  /* eslint-disable */
-  if ( typeof window.CustomEvent === "function" ) return false;
 
-  function CustomEvent ( event, params ) {
-    params = params || { bubbles: false, cancelable: false, detail: null };
-    var evt = document.createEvent( 'CustomEvent' );
-    evt.initCustomEvent( event, params.bubbles, params.cancelable, params.detail );
-    return evt;
-  }
-
-  CustomEvent.prototype = window.Event.prototype;
-
-  window.CustomEvent = CustomEvent;
-  /* eslint-enable */
+// ==================================================
+// ==================================================
+// myKetoPal end
+// ==================================================
+// ==================================================
 }
+
 
 /**
  * @param {Function} fn 
@@ -1003,4 +1005,22 @@ async function execOnPage(fn, jsonParam) {
   
   document.body.removeChild(script);
   return result;
+}
+
+// https://developer.mozilla.org/en-US/docs/Web/API/CustomEvent/CustomEvent#Polyfill
+function customEventPolyfill() {
+  /* eslint-disable */
+  if ( typeof window.CustomEvent === "function" ) return false;
+
+  function CustomEvent ( event, params ) {
+    params = params || { bubbles: false, cancelable: false, detail: null };
+    var evt = document.createEvent( 'CustomEvent' );
+    evt.initCustomEvent( event, params.bubbles, params.cancelable, params.detail );
+    return evt;
+  }
+
+  CustomEvent.prototype = window.Event.prototype;
+
+  window.CustomEvent = CustomEvent;
+  /* eslint-enable */
 }

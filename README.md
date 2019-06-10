@@ -2,14 +2,17 @@
 
 Optimze MyFitnessPal for a Keto diet.
 
-Improves the [diary](screenshots/diaryScreenshot.png) and [printable diary](screenshots/printableDiaryScreenshot.png) pages:
+Improves the diary and printable diary pages:
 
  - Replaces calories with net calories
  - Adds macro calorie percentages using 4-4-9
  - Adds macro graphs
 
-![Diary Page](screenshots/diaryScreenshot.png)
+-----
 
+![screenshot](screenshot.png)
+
+-----
 
 ## Setup
 

@@ -17,35 +17,35 @@
  * @typedef {'full'|'printable'} DiaryType
  * 
  * @typedef DiaryTable
- * @property {string}              type
- * @property {DiaryColumn[]}       columns
- * @property {DiaryColumn}         [carbsColumn]
- * @property {DiaryColumn}         [fiberColumn]
- * @property {DiaryColumn}         [fatColumn]
- * @property {DiaryColumn}         [proteinColumn]
- * @property {DiaryColumn}         [netCarbsColumn]
- * @property {Meal[]}              meals
- * @property {Nutrients[]}         [totalNutrients]
- * @property {Nutrients[]}         [goalNutrients]
- * @property {Nutrients[]}         [remainingNutrients]
- * @property {HTMLTableElement}    tableElem
- * @property {HTMLTableRowElement} [headerRowElem]
- * @property {HTMLTableRowElement} [totalsRowElem]
- * @property {HTMLTableRowElement} [goalRowElem]
- * @property {HTMLTableRowElement} [remainingRowElem]
- * @property {HTMLTableRowElement} [footerRowElem]
+ * @property {DiaryType}                  type
+ * @property {DiaryColumn[]}              columns
+ * @property {DiaryColumn | null}         carbsColumn
+ * @property {DiaryColumn | null}         fiberColumn
+ * @property {DiaryColumn | null}         fatColumn
+ * @property {DiaryColumn | null}         proteinColumn
+ * @property {DiaryColumn | null}         netCarbsColumn
+ * @property {Meal[]}                     meals
+ * @property {Nutrient[] | null}          totalNutrients
+ * @property {Nutrient[] | null}          goalNutrients
+ * @property {Nutrient[] | null}          remainingNutrients
+ * @property {HTMLTableElement}           tableElem
+ * @property {HTMLTableRowElement | null} headerRowElem
+ * @property {HTMLTableRowElement | null} totalsRowElem
+ * @property {HTMLTableRowElement | null} goalRowElem
+ * @property {HTMLTableRowElement | null} remainingRowElem
+ * @property {HTMLTableRowElement | null} footerRowElem
  * 
  * @typedef DiaryColumn
- * @property {string}               name
- * @property {number}               index
- * @property {HTMLTableCellElement} headerCellElem
+ * @property {string}                      name
+ * @property {number}                      index
+ * @property {HTMLTableCellElement | null} headerCellElem
  * 
  * @typedef Meal
- * @property {string}              name
- * @property {Food[]}              foods
- * @property {Nutrient[]}          [totalNutrients]
- * @property {HTMLTableRowElement} headerRowElem
- * @property {HTMLTableRowElement} [totalsRowElem]
+ * @property {string | null}              name
+ * @property {Food[]}                     foods
+ * @property {Nutrient[] | null}          totalNutrients
+ * @property {HTMLTableRowElement}        headerRowElem
+ * @property {HTMLTableRowElement | null} totalsRowElem
  * 
  * @typedef Food
  * @property {string}              name
@@ -53,14 +53,14 @@
  * @property {HTMLTableRowElement} rowElem
  * 
  * @typedef Nutrient
- * @property {DiaryColumn}          [column]
+ * @property {DiaryColumn | null}   column
  * @property {string}               valueStr
- * @property {number}               [value]
- * @property {string}               percentageStr
- * @property {number}               [percentage]
+ * @property {number | null}        value
+ * @property {string | null}        percentageStr
+ * @property {number | null}        percentage
  * @property {HTMLTableCellElement} cellElem
  * @property {Element}              valueElem
- * @property {Element}              [percentageElem]
+ * @property {Element | null}       percentageElem
  */
 
 let __execIdSeq = 0;
@@ -82,6 +82,7 @@ function myKetoPal() {
 // ==================================================
 
 
+/** @type {Promise<void> | null} */
 let googleAPIPromise = null;
 
 (async function run() {
@@ -131,6 +132,7 @@ async function loadGoogleAPI() {
 function getDiaryTables(container) {
   // NOTE: we use the [id=] selector instead of # because MyFitnessPal
   // reuses the same ID multiple times
+  /** @type {HTMLTableElement[]} */
   const diaryTableElems = Array.from(container.querySelectorAll(`
     [id=diary-table],
     [id=food]
@@ -146,7 +148,7 @@ function getDiaryTables(container) {
 
 /**
  * @param {HTMLTableElement} diaryTableElem 
- * @returns {DiaryTable}
+ * @returns {DiaryTable | null}
  */
 function readDiaryTable(diaryTableElem) {
   const type = getDiaryType(diaryTableElem);
@@ -156,20 +158,22 @@ function readDiaryTable(diaryTableElem) {
   const headerRowElem = diaryTableElem.querySelector('tr');
   const columns = getDiaryColumns(headerRowElem);
   
-  const carbsColumn    = columns.find(column => column.name === 'carbs'  );
-  const fiberColumn    = columns.find(column => column.name === 'fiber'  );
-  const fatColumn      = columns.find(column => column.name === 'fat'    );
-  const proteinColumn  = columns.find(column => column.name === 'protein');
+  const carbsColumn    = columns.find(column => column.name === 'carbs'  ) || null;
+  const fiberColumn    = columns.find(column => column.name === 'fiber'  ) || null;
+  const fatColumn      = columns.find(column => column.name === 'fat'    ) || null;
+  const proteinColumn  = columns.find(column => column.name === 'protein') || null;
+  /** @type {DiaryColumn | null} */
   const netCarbsColumn = null;
   
   // separate the rows
-  /** @type {HTMLTableRowElement[]} */ let mealRowElems     = [];
-  /** @type {HTMLTableRowElement}   */ let totalsRowElem    = null;
-  /** @type {HTMLTableRowElement}   */ let goalRowElem      = null;
-  /** @type {HTMLTableRowElement}   */ let remainingRowElem = null;
-  /** @type {HTMLTableRowElement}   */ let footerRowElem    = null;
+  /** @type {HTMLTableRowElement[]}      */ let mealRowElems     = [];
+  /** @type {HTMLTableRowElement | null} */ let totalsRowElem    = null;
+  /** @type {HTMLTableRowElement | null} */ let goalRowElem      = null;
+  /** @type {HTMLTableRowElement | null} */ let remainingRowElem = null;
+  /** @type {HTMLTableRowElement | null} */ let footerRowElem    = null;
   
   if (type === 'full') {
+    /** @type {HTMLTableRowElement[]} */
     const rowElems = Array.from(diaryTableElem.querySelectorAll('tbody tr'));
     for (const rowElem of rowElems) {
       if (rowElem.classList.contains('spacer')) {
@@ -230,7 +234,7 @@ function readDiaryTable(diaryTableElem) {
 
 /**
  * @param {HTMLTableElement} diaryTableElem 
- * @returns {DiaryType}
+ * @returns {DiaryType | null}
  */
 function getDiaryType(diaryTableElem) {
   switch (diaryTableElem && diaryTableElem.id) {
@@ -241,7 +245,7 @@ function getDiaryType(diaryTableElem) {
 }
 
 /**
- * @param {HTMLTableRowElement} headerRowElem 
+ * @param {HTMLTableRowElement | null} headerRowElem 
  * @returns {DiaryColumn[]}
  */
 function getDiaryColumns(headerRowElem) {
@@ -270,11 +274,20 @@ function getDiaryColumns(headerRowElem) {
 
 /**
  * @param {HTMLTableRowElement[]} mealRowElems 
- * @param {DiaryColumn} columns 
+ * @param {DiaryColumn[]} columns 
  */
 function readMeals(mealRowElems, columns) {
+  /**
+   * @typedef IMealRowGroup
+   * @property {HTMLTableRowElement} headerRowElem
+   * @property {HTMLTableRowElement | null} totalsRowElem
+   * @property {HTMLTableRowElement[]} foodRowElems
+   */
+  
   // group the rows by meal
-  let mealRowGroups = [];
+  /** @type {IMealRowGroup[]} */
+  const mealRowGroups = [];
+  /** @type {IMealRowGroup | null} */
   let cMealRowGroup = null;
   for (const rowElem of mealRowElems) {
     const isHeaderRow = (
@@ -315,15 +328,16 @@ function readMeals(mealRowElems, columns) {
 }
 
 /**
- * @param {HTMLTableRowElement} [headerRowElem] 
- * @param {HTMLTableRowElement} [totalsRowElem] 
+ * @param {HTMLTableRowElement} headerRowElem 
+ * @param {HTMLTableRowElement | null} totalsRowElem 
  * @param {HTMLTableRowElement[]} foodRowElems 
  * @param {DiaryColumn[]} columns 
  * @returns {Meal}
  */
 function readMeal(headerRowElem, totalsRowElem, foodRowElems, columns) {
   // get name from the first column in the header row
-  const name = headerRowElem? headerRowElem.querySelector('td').innerText.trim() : null;
+  const headerRowNameElem = headerRowElem && headerRowElem.querySelector('td');
+  const name = headerRowNameElem? headerRowNameElem.innerText.trim() : null;
   
   // read each food row
   const foods = removeFalsey(
@@ -348,10 +362,10 @@ function readMeal(headerRowElem, totalsRowElem, foodRowElems, columns) {
 /**
  * @param {HTMLTableRowElement} foodRowElem 
  * @param {DiaryColumn[]} columns 
- * @param {Food}
+ * @returns {Food | null}
  */
 function readFood(foodRowElem, columns) {
-  if (!foodRowElem) return [];
+  if (!foodRowElem) return null;
   
   // first column is the food name
   const cellElems = Array.from(foodRowElem.querySelectorAll('td'));
@@ -384,15 +398,17 @@ function readRowNutrients(rowElem, columns) {
   for (let i = startCellIndex; i < cellElems.length; ++i) {
     const cellElem = cellElems[i];
     
-    const column = columns.find(column => column.index === i);
+    const column = columns.find(column => column.index === i) || null;
     
+    /** @type {HTMLSpanElement | HTMLTableDataCellElement} */
     const valueElem = cellElem.querySelector('.macro-value') || cellElem;
     const valueStr = valueElem.innerText.trim();
     const value = parseNutrientNumber(valueStr);
     
+    /** @type {HTMLSpanElement | null} */
     const percentageElem = cellElem.querySelector('.macro-percentage');
     const percentageStr = percentageElem? percentageElem.innerText.trim() : null;
-    const percentage = percentageElem? parseNutrientNumber(percentageStr) : null;
+    const percentage = percentageStr? parseNutrientNumber(percentageStr) : null;
     
     const nutrient = {
       column,
@@ -412,7 +428,7 @@ function readRowNutrients(rowElem, columns) {
 
 /**
  * @param {string} str 
- * @returns {number}
+ * @returns {number | null}
  */
 function parseNutrientNumber(str) {
   // check for a floating point number
@@ -485,7 +501,7 @@ function insertDiaryNetCarbsColumn(diaryTable, targetColumnIndex = -1) {
   let totalNetCarbs = 0;
   
   for (const meal of diaryTable.meals) {
-    let mealTotalNetCarbs = null;
+    let mealTotalNetCarbs = 0;
     
     for (const food of meal.foods) {
       // increase colspan for meal header cell
@@ -494,8 +510,8 @@ function insertDiaryNetCarbsColumn(diaryTable, targetColumnIndex = -1) {
       }
       
       // calculate net carbs for food
-      const carbs = NaNify(getNutrientValue(food.nutrients, diaryTable.carbsColumn));
-      const fiber = NaNify(getNutrientValue(food.nutrients, diaryTable.fiberColumn));
+      const carbs = nanify(getNutrientValue(food.nutrients, diaryTable.carbsColumn));
+      const fiber = nanify(getNutrientValue(food.nutrients, diaryTable.fiberColumn));
       
       const netCarbs = Math.max(carbs - fiber, 0);
       mealTotalNetCarbs += netCarbs;
@@ -503,6 +519,7 @@ function insertDiaryNetCarbsColumn(diaryTable, targetColumnIndex = -1) {
       
       // create cell for food nutrient
       food.nutrients.push(
+        // @ts-ignore
         buildDiaryNutrientCell(
           insertCell(food.rowElem, netCarbsColumn.index),
           diaryTable.type, netCarbsColumn, netCarbs, null, unit
@@ -513,6 +530,7 @@ function insertDiaryNetCarbsColumn(diaryTable, targetColumnIndex = -1) {
     // create cell for meal total nutrient
     if (meal.totalNutrients) {
       meal.totalNutrients.push(
+        // @ts-ignore
         buildDiaryNutrientCell(
           insertCell(meal.totalsRowElem, netCarbsColumn.index),
           diaryTable.type, netCarbsColumn, mealTotalNetCarbs, null, unit
@@ -522,11 +540,12 @@ function insertDiaryNetCarbsColumn(diaryTable, targetColumnIndex = -1) {
   }
   
   // create cells for footer rows
-  const netCarbsGoal = NaNify(getNutrientValue(diaryTable.goalNutrients, diaryTable.carbsColumn));
+  const netCarbsGoal = nanify(getNutrientValue(diaryTable.goalNutrients, diaryTable.carbsColumn));
   const netCarbsRemaining = netCarbsGoal - totalNetCarbs;
   
   if (diaryTable.totalNutrients) {
     diaryTable.totalNutrients.push(
+      // @ts-ignore
       buildDiaryNutrientCell(
         insertCell(diaryTable.totalsRowElem, netCarbsColumn.index),
         diaryTable.type, netCarbsColumn, totalNetCarbs, null, unit
@@ -536,6 +555,7 @@ function insertDiaryNetCarbsColumn(diaryTable, targetColumnIndex = -1) {
   
   if (diaryTable.goalNutrients) {
     diaryTable.goalNutrients.push(
+      // @ts-ignore
       buildDiaryNutrientCell(
         insertCell(diaryTable.goalRowElem, netCarbsColumn.index),
         diaryTable.type, netCarbsColumn, netCarbsGoal, null, unit
@@ -545,6 +565,7 @@ function insertDiaryNetCarbsColumn(diaryTable, targetColumnIndex = -1) {
   
   if (diaryTable.remainingNutrients) {
     diaryTable.remainingNutrients.push(
+      // @ts-ignore
       buildDiaryNutrientCell(
         insertCell(diaryTable.remainingRowElem, netCarbsColumn.index),
         diaryTable.type, netCarbsColumn, netCarbsRemaining, null, unit, true
@@ -561,11 +582,11 @@ function insertDiaryNetCarbsColumn(diaryTable, targetColumnIndex = -1) {
 }
 
 /**
- * @param {HTMLTableCellElement} cellElem 
+ * @param {HTMLTableCellElement | null} cellElem 
  * @param {DiaryType} diaryType 
  * @param {string} title 
  * @param {string} [unit] 
- * @returns {HTMLTableCellElement}
+ * @returns {HTMLTableCellElement | null}
  */
 function buildDiaryHeaderCell(cellElem, diaryType, title, unit = '') {
   if (!cellElem) return null;
@@ -599,23 +620,23 @@ function buildDiaryHeaderCell(cellElem, diaryType, title, unit = '') {
 }
 
 /**
- * @param {HTMLTableCellElement} cellElem 
+ * @param {HTMLTableCellElement | null} cellElem 
  * @param {DiaryType} diaryType 
- * @param {DiaryColumn} [column] 
- * @param {number} [_value] 
+ * @param {DiaryColumn | null} [column] 
+ * @param {number | null} [_value] 
+ * @param {number | null} [_percentage] 
  * @param {string} [unit] 
- * @param {number} [_percentage] 
  * @param {boolean} [applyPosNeg] 
- * @returns {Nutrient}
+ * @returns {Nutrient | null}
  */
-function buildDiaryNutrientCell(cellElem, diaryType, column, _value = null, _percentage = null, unit = '', applyPosNeg = false) {
+function buildDiaryNutrientCell(cellElem, diaryType, column = null, _value = null, _percentage = null, unit = '', applyPosNeg = false) {
   if (!cellElem) return null;
   
   const valueStrPrefix = diaryType === 'printable'? unit : '';
   
   let value;
   let valueStr;
-  if (isNaN(_value)) {
+  if (_value === null || isNaN(_value)) {
     value = null;
     valueStr = '?';
   }
@@ -630,7 +651,7 @@ function buildDiaryNutrientCell(cellElem, diaryType, column, _value = null, _per
   
   let percentage;
   let percentageStr;
-  if (isNaN(_percentage)) {
+  if (_percentage === null || isNaN(_percentage)) {
     percentage = null;
     percentageStr = '?';
   }
@@ -643,6 +664,7 @@ function buildDiaryNutrientCell(cellElem, diaryType, column, _value = null, _per
     percentageStr = _percentage === null || typeof _percentage === 'undefined'? '' : String(value);
   }
   
+  /** @type {HTMLTableCellElement | HTMLSpanElement} */
   let valueElem = cellElem;
   let percentageElem = null;
   
@@ -684,9 +706,9 @@ function buildDiaryNutrientCell(cellElem, diaryType, column, _value = null, _per
 }
 
 /**
- * @param {HTMLTableRowElement} rowElem 
+ * @param {HTMLTableRowElement | null} rowElem 
  * @param {number} [index] 
- * @returns {HTMLTableCellElement}
+ * @returns {HTMLTableCellElement | null}
  */
 function insertCell(rowElem, index = -1) {
   if (!rowElem) return null;
@@ -698,7 +720,7 @@ function insertCell(rowElem, index = -1) {
  */
 function insertTotalCaloriePercentages(diaryTable) {
   // get the total nutrients for each meal
-  /** @type {Nutrient[][]} */
+  /** @type {(Nutrient[] | null)[]} */
   const nutrientsList = [
     diaryTable.totalNutrients,
     diaryTable.goalNutrients
@@ -724,15 +746,16 @@ function insertTotalCaloriePercentages(diaryTable) {
       continue;
     }
     
-    const carbCals    = NaNify(netCarbs) * 4;
-    const proteinCals = NaNify(protein) * 4;
-    const fatCals     = NaNify(fat) * 9;
+    const carbCals    = nanify(netCarbs) * 4;
+    const proteinCals = nanify(protein) * 4;
+    const fatCals     = nanify(fat) * 9;
     const totalCals   = carbCals + proteinCals + fatCals;
     
     if (totalCals === 0) {
       continue;
     }
     
+    /** @type {[Nutrient | null, number][]} */
     const sets = [
       [netCarbsNutrient, carbCals   ],
       [proteinNutrient,  proteinCals],
@@ -740,8 +763,10 @@ function insertTotalCaloriePercentages(diaryTable) {
     ];
     
     // make all nutrient cells alight to top
-    for (const nutrient of nutrients) {
-      nutrient.cellElem.style.verticalAlign = 'top';
+    if (nutrients) {
+      for (const nutrient of nutrients) {
+        nutrient.cellElem.style.verticalAlign = 'top';
+      }
     }
     
     // create percentage elements for macro nutrients
@@ -814,16 +839,16 @@ async function insertGraphs(diaryTable) {
 
 /**
  * @param {DiaryTable} diaryTable 
- * @param {Element} containerElem 
- * @returns {object}
+ * @param {HTMLElement} containerElem 
+ * @returns {Promise<any>}
  */
 async function insertKetoCalorieGraph(diaryTable, containerElem) {
   await googleAPIPromise;
   
   // get nutrients totals
-  const netCarbs = NaNify(getNutrientValue(diaryTable.totalNutrients, diaryTable.netCarbsColumn));
-  const protein  = NaNify(getNutrientValue(diaryTable.totalNutrients, diaryTable.proteinColumn));
-  const fat      = NaNify(getNutrientValue(diaryTable.totalNutrients, diaryTable.fatColumn));
+  const netCarbs = nanify(getNutrientValue(diaryTable.totalNutrients, diaryTable.netCarbsColumn));
+  const protein  = nanify(getNutrientValue(diaryTable.totalNutrients, diaryTable.proteinColumn));
+  const fat      = nanify(getNutrientValue(diaryTable.totalNutrients, diaryTable.fatColumn));
   
   const carbCals    = netCarbs * 4;
   const proteinCals = protein * 4;
@@ -838,6 +863,7 @@ async function insertKetoCalorieGraph(diaryTable, containerElem) {
     return;
   }
   
+  /** @type {Object<string, number>} */
   const rowMap = {
     'Carbs': carbCals,
     'Protein': proteinCals,
@@ -865,16 +891,16 @@ async function insertKetoCalorieGraph(diaryTable, containerElem) {
 
 /**
  * @param {DiaryTable} diaryTable 
- * @param {Element} containerElem
- * @returns {object}
+ * @param {HTMLElement} containerElem
+ * @returns {Promise<any>}
  */
 async function insertKetoNutrientGraph(diaryTable, containerElem) {
   await googleAPIPromise;
   
   // get nutrients totals
-  const netCarbs = NaNify(getNutrientValue(diaryTable.totalNutrients, diaryTable.netCarbsColumn));
-  const protein  = NaNify(getNutrientValue(diaryTable.totalNutrients, diaryTable.proteinColumn));
-  const fat      = NaNify(getNutrientValue(diaryTable.totalNutrients, diaryTable.fatColumn));
+  const netCarbs = nanify(getNutrientValue(diaryTable.totalNutrients, diaryTable.netCarbsColumn));
+  const protein  = nanify(getNutrientValue(diaryTable.totalNutrients, diaryTable.proteinColumn));
+  const fat      = nanify(getNutrientValue(diaryTable.totalNutrients, diaryTable.fatColumn));
   
   const totalGrams = netCarbs + protein + fat;
   
@@ -886,6 +912,7 @@ async function insertKetoNutrientGraph(diaryTable, containerElem) {
     return;
   }
   
+  /** @type {Object<string, number>} */
   const rowMap = {
     'Net Carbs': netCarbs,
     'Protein': protein,
@@ -912,9 +939,9 @@ async function insertKetoNutrientGraph(diaryTable, containerElem) {
 }
 
 /**
- * @param {Nutrient[]} nutrients 
- * @param {DiaryColumn} column 
- * @returns {Nutrient}
+ * @param {Nutrient[] | null} nutrients 
+ * @param {DiaryColumn | null} column 
+ * @returns {Nutrient | null}
  */
 function getNutrient(nutrients, column) {
   if (!nutrients) return null;
@@ -927,9 +954,9 @@ function getNutrient(nutrients, column) {
 }
 
 /**
- * @param {Nutrient[]} nutrients 
- * @param {DiaryColumn} column 
- * @returns {number}
+ * @param {Nutrient[] | null} nutrients 
+ * @param {DiaryColumn | null} column 
+ * @returns {number | null}
  */
 function getNutrientValue(nutrients, column) {
   const nutrient = getNutrient(nutrients, column);
@@ -940,19 +967,19 @@ function getNutrientValue(nutrients, column) {
 
 /**
  * @template T
- * @param {T[]} arr 
+ * @param {(T | null)[]} arr 
  * @returns {T[]}
  */
 function removeFalsey(arr) {
   if (!Array.isArray(arr)) return arr;
-  return arr.filter(x => x);
+  return /** @type {T[]} */(arr.filter(x => x));
 }
 
 /**
- * @param {number} val 
+ * @param {any} val 
  * @returns {number}
  */
-function NaNify(val) {
+function nanify(val) {
   return typeof val === 'number'? val : NaN;
 }
 
@@ -974,32 +1001,46 @@ function roundPrct(num) {
 
 
 /**
- * @param {Function} fn 
- * @param {*} jsonParam
+ * @param {(param?: any) => void} fn 
+ * @param {any} [jsonParam] 
  */
 async function execOnPage(fn, jsonParam) {
   const execId = __execIdSeq++;
+  const eventName = 'exec-on-page-complete';
+  
   const script = document.createElement('script');
   script.setAttribute('async', '');
   script.textContent = `
-    (
-      async () => await (${fn})(${JSON.stringify(jsonParam)})
+    const currentScript = document.currentScript;
+    (async () =>
+      await (${fn})(${JSON.stringify(jsonParam)})
     )()
-    .then (result => document.dispatchEvent(new CustomEvent('exec-on-page-complete', {detail: {id: ${JSON.stringify(execId)}, result}})))
-    .catch(error  => document.dispatchEvent(new CustomEvent('exec-on-page-complete', {detail: {id: ${JSON.stringify(execId)}, error }})));
+    .then (result => document.dispatchEvent(new CustomEvent(${JSON.stringify(eventName)}, {detail: {id: ${JSON.stringify(execId)}, result}})))
+    .catch(error  => document.dispatchEvent(new CustomEvent(${JSON.stringify(eventName)}, {detail: {id: ${JSON.stringify(execId)}, error }})))
+    .finally(() => {currentScript.remove();})
   `;
   
   const result = await new Promise((resolve, reject) => {
-    document.addEventListener('exec-on-page-complete', event => {
-      if (!event.detail || event.detail.id !== execId) {
+    /** @type {EventListener} */
+    const eventListener = event => {
+      if (
+        !(event instanceof CustomEvent) ||
+        !event.detail ||
+        event.detail.id !== execId
+      ) {
         return;
       }
+      
+      document.removeEventListener(eventName, eventListener);
+      
       if (event.detail.error) {
         reject(event.detail.error);
         return;
       }
       resolve(event.detail.result);
-    }, {once: true});
+    };
+    
+    document.addEventListener(eventName, eventListener);
     document.body.appendChild(script);
   });
   
@@ -1012,6 +1053,7 @@ function customEventPolyfill() {
   /* eslint-disable */
   if ( typeof window.CustomEvent === "function" ) return false;
 
+  // @ts-ignore
   function CustomEvent ( event, params ) {
     params = params || { bubbles: false, cancelable: false, detail: null };
     var evt = document.createEvent( 'CustomEvent' );
@@ -1021,6 +1063,7 @@ function customEventPolyfill() {
 
   CustomEvent.prototype = window.Event.prototype;
 
+  // @ts-ignore
   window.CustomEvent = CustomEvent;
   /* eslint-enable */
 }

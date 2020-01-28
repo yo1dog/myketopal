@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          MyKetoPal
 // @namespace     http://yo1.dog
-// @version       1.0.2
+// @version       1.0.3
 // @description   Optimizes MyFitnessPal for a Ketogenic diet
 // @author        Mike "yo1dog" Moore
 // @homepageURL   https://github.com/yo1dog/myketopal#readme

@@ -1,6 +1,6 @@
 {
   "name": "myketopal",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Optimizes MyFitnessPal for a Ketogenic diet",
   "main": "myKetoPal.user.js",
   "scripts": {

@@ -1011,13 +1011,11 @@ async function execOnPage(fn, jsonParam) {
   const script = document.createElement('script');
   script.setAttribute('async', '');
   script.textContent = `
-    const currentScript = document.currentScript;
     (async () =>
       await (${fn})(${JSON.stringify(jsonParam)})
     )()
     .then (result => document.dispatchEvent(new CustomEvent(${JSON.stringify(eventName)}, {detail: {id: ${JSON.stringify(execId)}, result}})))
     .catch(error  => document.dispatchEvent(new CustomEvent(${JSON.stringify(eventName)}, {detail: {id: ${JSON.stringify(execId)}, error }})))
-    .finally(() => {currentScript.remove();})
   `;
   
   const result = await new Promise((resolve, reject) => {
